@@ -1,15 +1,25 @@
 # 📌 Lecture 16 — Beyond Kubernetes: Alternative Deployment Models
 
+Лекция 16 — За пределами Kubernetes: альтернативные модели деплоя
+
 > 🎯 **The course finale.** You spent 15 lectures learning how to run containers on a cluster. Now we ask the question every senior engineer eventually asks: *did we actually need the cluster?*
+>
+> 🎯 **Финальная лекция курса.** Ты потратил 15 лекций на то, чтобы научиться запускать контейнеры в кластере. Теперь — вопрос, который рано или поздно задаёт каждый senior-инженер: *а кластер-то нам действительно был нужен?*
 
 ---
 
 ## 📍 Slide 1 – 🚀 The Question Every Architect Eventually Asks
 
+Слайд 1 — Вопрос, который рано или поздно задаёт каждый архитектор
+
 * ☸️ You can deploy to Kubernetes. **You proved it across Labs 8–16.**
+  * ☸️ Ты умеешь деплоить в Kubernetes. **Ты доказал это на лабах 8–16.**
 * 🤔 But for many workloads K8s is the **wrong abstraction** — too much surface area for too little payoff
+  * 🤔 Но для многих задач K8s — **не та абстракция**: слишком много поверхности при слишком малой отдаче
 * 🌍 In 2026 the deployment menu is no longer just "VM vs container" — it's a **spectrum** of runtimes optimized for very different problems
+  * 🌍 В 2026 году выбор деплоя — уже не просто «VM или контейнер», а **спектр** рантаймов, заточенных под очень разные задачи
 * 🎯 Today: edge serverless (lab 17) and reproducible builds (lab 18), plus when each beats K8s
+  * 🎯 Сегодня: edge serverless (лаба 17) и воспроизводимые сборки (лаба 18), а также когда что из этого выигрывает у K8s
 
 ```mermaid
 flowchart LR
@@ -21,13 +31,21 @@ flowchart LR
   Q -->|Polyglot serverless| Wasm[🕸️ WASM / Spin]
 ```
 
+Схема: приложение → вопрос «Что важнее всего?» → Kubernetes (контроль и масштаб), Workers/Lambda@Edge (низкая задержка и ноль ops), Nix (воспроизводимость), Firecracker/Fly Machines (сильная изоляция и быстрый старт), WASM/Spin (полиглотный serverless).
+
 > 📚 **Frame for today:** every model on this slide is *also* production-grade. The skill is knowing which problem each one solves — and which problems it doesn't.
+>
+> 📚 **Установка на сегодня:** каждая модель на этом слайде *тоже* пригодна для продакшена. Навык — понимать, какую проблему решает каждая из них, а какую нет.
 
 ---
 
 ## 📍 Slide 2 – 🎯 Learning Outcomes
 
+Слайд 2 — Результаты обучения
+
 By the end of this lecture you can:
+
+К концу этой лекции ты сможешь:
 
 | # | Outcome |
 |---|---------|
@@ -38,9 +56,20 @@ By the end of this lecture you can:
 | 5 | 🚀 Map Lab 17 (Cloudflare Workers) and Lab 18 (Nix) onto the deployment spectrum |
 | 6 | 🔮 Name the next-wave runtimes (WASM, unikernels, Firecracker) and what they're for |
 
+| # | Результат |
+|---|-----------|
+| 1 | 🧠 Объяснить, что такое **V8 isolate** и почему его холодный старт занимает <5 мс |
+| 2 | ⚖️ Сравнить **edge serverless** (Workers) с **региональным FaaS** (Lambda) |
+| 3 | ❄️ Описать, что гарантирует **Nix derivation** и чего не гарантирует Dockerfile |
+| 4 | 📊 Выбирать между K8s, edge, microVM, PaaS и статическим хостингом по матрице сценариев |
+| 5 | 🚀 Разместить лабу 17 (Cloudflare Workers) и лабу 18 (Nix) на спектре деплоя |
+| 6 | 🔮 Назвать рантаймы новой волны (WASM, unikernels, Firecracker) и их назначение |
+
 ---
 
 ## 📍 Slide 3 – 🧰 Tech Stack for Today (May 2026)
+
+Слайд 3 — Технологический стек на сегодня (май 2026)
 
 | Tool | Version / Status | Notes |
 |------|------------------|-------|
@@ -53,11 +82,26 @@ By the end of this lecture you can:
 | **Fly.io** | Fly Machines on Firecracker | Same microVM tech as Lambda; you keep the VM |
 | **Fermyon Spin** | v3.5 (WASI 0.3 preview) | Acquired by Akamai Dec 2025 → Akamai Functions |
 
+| Инструмент | Версия / статус | Примечания |
+|------|------------------|-------|
+| **Cloudflare Workers** | workerd + V8 isolates, 330+ edge POPs | Холодный старт <5 мс; бесплатный тариф — 100 тыс. запросов в день, 10 мс CPU; $5/мес Paid = 10 млн запросов + 50 мс CPU |
+| **Wrangler CLI** | **4.94+** | По умолчанию local-first; `--remote` теперь включается явно |
+| **Workers KV / D1 / R2 / Durable Objects** | GA | Примитивы состояния, привязанные к edge |
+| **Nix** | **2.25** (ноябрь 2024), 2.26+ в разработке | Установщик Determinate включает flakes по умолчанию |
+| **Lix** | Форк сообщества (отделён в марте 2024) | Замена `nix` один-в-один; FlakeHub — реестр SemVer |
+| **AWS Lambda runtime** | Firecracker microVM, загрузка ~125 мс | Изоляция на каждый вызов |
+| **Fly.io** | Fly Machines на Firecracker | Та же microVM-технология, что в Lambda; VM остаётся под твоим контролем |
+| **Fermyon Spin** | v3.5 (превью WASI 0.3) | Куплен Akamai в декабре 2025 → Akamai Functions |
+
 > 🧷 Two of these tools — **Cloudflare Workers** and **Nix** — are the entire content of Labs 17 and 18. The rest are context for the world you're about to enter.
+>
+> 🧷 Два инструмента из списка — **Cloudflare Workers** и **Nix** — это всё содержание лаб 17 и 18. Остальные дают контекст о мире, в который ты входишь.
 
 ---
 
 ## 📍 Slide 4 – 🗺️ Course Arc, One Last Time
+
+Слайд 4 — Арка курса, в последний раз
 
 ```mermaid
 flowchart LR
@@ -70,27 +114,46 @@ flowchart LR
   L15 --> L16[Lec 16<br/>Beyond K8s]
 ```
 
+Схема: Lec 1 (зачем DevOps) → Lec 2–3 (Docker + CI) → Lec 4–6 (Compose, IaC, Ansible) → Lec 7–8 (основы K8s) → Lec 9–12 (Helm, секреты, хранилища) → Lec 13–14 (GitOps и progressive delivery) → Lec 15 (наблюдаемость) → Lec 16 (за пределами K8s).
+
 You climbed the abstraction ladder from `chroot` → containers → orchestration → GitOps. Today we look **sideways** at runtimes that took a different path up the mountain.
+
+Ты прошёл лестницу абстракций от `chroot` → контейнеров → оркестрации → GitOps. Сегодня мы смотрим **вбок** на рантаймы, которые поднялись на эту гору другим путём.
 
 ---
 
 ## 📍 Slide 5 – ⚠️ The Kubernetes Tax
 
+Слайд 5 — Налог на Kubernetes
+
 K8s gives you control. Control has a price tag:
 
+K8s даёт тебе контроль. А у контроля есть цена:
+
 * 🔧 **Cluster operations** — control plane upgrades, CRD migrations, etcd backups
+  * 🔧 **Эксплуатация кластера** — обновления control plane, миграции CRD, бэкапы etcd
 * 🧠 **Team expertise** — kubectl, RBAC, networking, storage classes, ingress controllers
+  * 🧠 **Экспертиза команды** — kubectl, RBAC, сети, storage classes, ingress-контроллеры
 * 💰 **Idle cost** — control plane ($72/mo on EKS) + min 3 worker nodes even at zero traffic
+  * 💰 **Стоимость простоя** — control plane ($72/мес на EKS) + минимум 3 worker-ноды даже при нулевом трафике
 * ⏱️ **Lead time to first deploy** — for a fresh team, days. With managed K8s + a platform team, still hours
+  * ⏱️ **Время до первого деплоя** — для новой команды это дни. С managed K8s и платформенной командой — всё равно часы
 * 🕵️ **Attack surface** — every CRD, every webhook, every operator is code running in your cluster
+  * 🕵️ **Поверхность атаки** — каждый CRD, каждый webhook, каждый оператор — это код, работающий в твоём кластере
 
 > 💬 **Kelsey Hightower, 2017 (still true):** *"Kubernetes is a platform for building platforms. It's a better place to start, not the endgame."*
+>
+> 💬 **Келси Хайтауэр, 2017 (до сих пор верно):** *«Kubernetes — это платформа для построения платформ. Это хорошая отправная точка, а не финальная цель.»*
 
 For a single-region static site or a webhook that runs 200 times a day, the platform overhead eats the value.
+
+Для статического сайта в одном регионе или вебхука, который срабатывает 200 раз в день, накладные расходы платформы съедают всю ценность.
 
 ---
 
 ## 📍 Slide 6 – 🚩 Signals K8s Is Overkill
+
+Слайд 6 — Признаки того, что K8s избыточен
 
 | 🚩 Signal | 💡 Better fit |
 |----------|---------------|
@@ -101,11 +164,24 @@ For a single-region static site or a webhook that runs 200 times a day, the plat
 | Reproducibility > orchestration | Nix + bare metal or microVM |
 | 1-person dev team, "must ship by Friday" | **Anything but K8s** |
 
+| 🚩 Признак | 💡 Что подходит лучше |
+|----------|---------------|
+| 1–2 сервиса, нет потребности в горизонтальном масштабировании | PaaS (Fly.io, Render, Railway) |
+| Резкие пики трафика с долгими паузами | Serverless (Lambda, Cloud Run) |
+| Требовательность к задержке по всему миру | Edge-рантайм (Workers, Lambda@Edge) |
+| Чисто статический сайт или SPA | Pages / Netlify / Vercel |
+| Воспроизводимость важнее оркестрации | Nix + bare metal или microVM |
+| Команда из одного разработчика, «надо выпустить к пятнице» | **Что угодно, кроме K8s** |
+
 > 💬 **DORA wisdom:** the highest-performing teams optimise for **flow**, not technology grandeur. The simplest deployment that delivers the business outcome is usually the right one.
+>
+> 💬 **Мудрость DORA:** самые эффективные команды оптимизируют **поток**, а не грандиозность технологий. Простейший деплой, который даёт бизнес-результат, обычно и есть правильный.
 
 ---
 
 ## 📍 Slide 7 – 📊 The Abstraction Spectrum
+
+Слайд 7 — Спектр абстракций
 
 ```mermaid
 flowchart LR
@@ -118,6 +194,8 @@ flowchart LR
   Edge --> Static[📄 Static hosting]
 ```
 
+Схема: 🖥️ bare metal → ☁️ IaaS/VM → 🔥 microVM → ☸️ Kubernetes → 🚂 PaaS → ⚡ serverless/FaaS → 🌍 edge-изоляты → 📄 статический хостинг.
+
 | Layer | You manage | Platform manages | Boot time |
 |-------|-----------|------------------|-----------|
 | Bare metal | OS, drivers, runtime, app | nothing | minutes |
@@ -129,21 +207,46 @@ flowchart LR
 | Edge isolates | function | global routing | **<5 ms** |
 | Static hosting | files | CDN | 0 (no compute) |
 
+| Слой | Ты управляешь | Платформа управляет | Время загрузки |
+|-------|-----------|------------------|-----------|
+| Bare metal | ОС, драйверы, рантайм, приложение | ничего | минуты |
+| VM (EC2) | ОС, рантайм, приложение | железо | 30–60 с |
+| microVM (Firecracker, Fly) | рантайм, приложение | гипервизор + ядро | ~125 мс |
+| Kubernetes | манифесты + приложение | планирование, сети | секунды (под), дни (кластер) |
+| PaaS | код приложения + конфиг | всё остальное | минуты |
+| Serverless / FaaS | функция | рантайм, масштабирование | 100 мс – 1 с |
+| Edge isolates | функция | глобальная маршрутизация | **<5 мс** |
+| Static hosting | файлы | CDN | 0 (без вычислений) |
+
 Each row trades **control** for **simplicity**. Pick the highest row you can tolerate.
+
+Каждая строка меняет **контроль** на **простоту**. Выбирай самый высокий уровень, который можешь себе позволить.
 
 ---
 
 ## 📍 Slide 8 – 🌍 Section 1: Edge Compute — Code Where the Users Are
 
+Слайд 8 — Раздел 1: Edge-вычисления — код там, где пользователи
+
 **Traditional cloud:**
+
+**Традиционное облако:**
+
 ```
 Tokyo user → 200 ms → us-east-1 → response
 ```
 
+Пояснение: пользователь из Токио идёт до региона us-east-1 за 200 мс и ждёт ответа.
+
 **Edge compute:**
+
+**Edge-вычисления:**
+
 ```
 Tokyo user → 20 ms → Cloudflare Tokyo POP → response
 ```
+
+Пояснение: с edge код выполняется в ближайшем POP Cloudflare в Токио, и задержка падает до 20 мс.
 
 ```mermaid
 flowchart TD
@@ -154,14 +257,22 @@ flowchart TD
   R --> P4[🗼 Cloudflare ... 330+ POPs]
 ```
 
+Схема: пользователь из любой точки → Anycast DNS → ближайший POP Cloudflare (Токио, Лондон, Сан-Паулу и ещё 330+ точек).
+
 * ⚡ **Latency cliff** disappears — your code is already where the user is
+  * ⚡ **Обрыв задержки** исчезает — твой код уже рядом с пользователем
 * 🌍 **No region picker** — there is no "us-east-1" in edge land
+  * 🌍 **Никакого выбора региона** — в мире edge «us-east-1» не существует
 * 💸 **Pay per request, not per idle hour** — true scale-to-zero
+  * 💸 **Платишь за запрос, а не за час простоя** — настоящий scale-to-zero
 * 📏 **Constrained** — short CPU budgets, smaller dep trees, no native binaries
+  * 📏 **Жёсткие ограничения** — короткие бюджеты CPU, меньшее дерево зависимостей, нет нативных бинарников
 
 ---
 
 ## 📍 Slide 9 – 🧪 V8 Isolates — How Cloudflare Workers Skips the Container
+
+Слайд 9 — V8-изоляты — как Cloudflare Workers обходится без контейнера
 
 ```mermaid
 flowchart LR
@@ -174,19 +285,33 @@ flowchart LR
   end
 ```
 
+Схема: вызов AWS Lambda — загрузка microVM → инициализация рантайма → твой код; вызов Cloudflare Workers — поднимается V8-изолят → сразу твой код.
+
 * 🧬 **Isolate ≠ container.** It's a sandboxed JS heap inside an already-running V8 process
+  * 🧬 **Изолят ≠ контейнер.** Это песочница JS-кучи внутри уже запущенного процесса V8
 * ⏱️ **Cold start: <5 ms.** Lambda containers: 100 ms – 1 s+
+  * ⏱️ **Холодный старт: <5 мс.** Контейнеры Lambda: 100 мс – 1 с и больше
 * 🧠 **Memory: ~3 MB per isolate.** Lambda microVM: ≥128 MB
+  * 🧠 **Память: ~3 МБ на изолят.** Lambda microVM: ≥128 МБ
 * 🏭 **Density:** one Worker node serves thousands of tenants on one V8 process
+  * 🏭 **Плотность:** одна нода Worker обслуживает тысячи арендаторов в одном процессе V8
 * 🚫 **Trade-off:** no filesystem, no native modules, 10 ms CPU on free tier (50 ms paid, burstable to 5 min)
+  * 🚫 **Компромисс:** нет файловой системы и нативных модулей, 10 мс CPU на бесплатном тарифе (50 мс на платном с бурстом до 5 минут)
 
 > 🔬 **The architectural bet:** sandbox at the **language runtime** layer, not the **OS kernel** layer. Smaller blast radius, smaller boot cost.
+>
+> 🔬 **Архитектурная ставка:** песочница на уровне **языкового рантайма**, а не **ядра ОС**. Меньше радиус поражения, меньше стоимость загрузки.
 
 ---
 
 ## 📍 Slide 10 – 🛠️ Anatomy of a Worker
 
+Слайд 10 — Анатомия Worker'а
+
 `src/index.ts`:
+
+Файл `src/index.ts`:
+
 ```ts
 export interface Env {
   APP_NAME: string;          // wrangler.jsonc var
@@ -211,11 +336,17 @@ export default {
 };
 ```
 
+Пояснение к коду: интерфейс `Env` описывает переменные и привязки; обработчик `fetch` отдаёт `/health`, `/edge`, `/counter` и возвращает 404 на остальное; счётчик посещений хранится в KV-пространстве `SETTINGS`.
+
 A whole HTTP API in one default export. No Dockerfile, no ingress, no HPA.
+
+Целый HTTP API в одном default export. Ни Dockerfile, ни ingress, ни HPA.
 
 ---
 
 ## 📍 Slide 11 – 🛫 Deploying a Worker
+
+Слайд 11 — Деплой Worker'а
 
 ```bash
 npm create cloudflare@latest -- edge-api    # scaffold
@@ -225,7 +356,11 @@ npx wrangler dev                             # local; uses workerd locally
 npx wrangler deploy                          # global rollout in seconds
 ```
 
+Пояснение к коду: команды создают проект, входят в аккаунт через браузер, запускают Worker локально на workerd и выкатывают его по всему миру за секунды.
+
 **State primitives bound at the edge:**
+
+**Примитивы состояния, привязанные к edge:**
 
 | Binding | What it is | Use case |
 |---------|-----------|----------|
@@ -234,11 +369,22 @@ npx wrangler deploy                          # global rollout in seconds
 | **R2** | S3-compatible blobs, no egress fees | assets, backups |
 | **Durable Objects** | strongly-consistent stateful actor | chat rooms, leaderboards |
 
+| Привязка | Что это | Сценарий использования |
+|---------|-----------|----------|
+| **KV** | eventually-consistent хранилище ключ/значение | фича-флаги, конфиги, счётчики |
+| **D1** | SQLite в каждом регионе с репликацией | небольшая реляционная БД |
+| **R2** | S3-совместимые блобы, без платы за исходящий трафик | ассеты, бэкапы |
+| **Durable Objects** | strongly-consistent stateful actor | чаты, таблицы лидеров |
+
 > 🔗 **Lab 17 tie-in:** you ship a Worker with `/health`, `/edge`, secrets, a KV-backed counter, two deploys, a rollback — and a Kubernetes-vs-Workers comparison table in `WORKERS.md`.
+>
+> 🔗 **Связь с лабой 17:** ты выкатываешь Worker с `/health`, `/edge`, секретами, счётчиком на KV, двумя деплоями, откатом — и таблицей сравнения Kubernetes и Workers в `WORKERS.md`.
 
 ---
 
 ## 📍 Slide 12 – ⚖️ Workers vs Lambda vs K8s, By Numbers
+
+Слайд 12 — Workers против Lambda против K8s — в цифрах
 
 | Metric | ☸️ K8s pod | 🔥 AWS Lambda | ⚡ Cloudflare Workers |
 |--------|-----------|---------------|----------------------|
@@ -251,13 +397,30 @@ npx wrangler deploy                          # global rollout in seconds
 | Long-running tasks | yes (any) | up to 15 min | 30 s wall-clock (paid; CPU 50 ms–5 min) |
 | Native binaries / Python wheels | yes | yes | limited (Python via Pyodide, no C extensions) |
 
+| Метрика | ☸️ Под K8s | 🔥 AWS Lambda | ⚡ Cloudflare Workers |
+|--------|-----------|---------------|----------------------|
+| Холодный старт | секунды (планирование + загрузка образа) | 100–1000 мс | **<5 мс** |
+| Минимум памяти | запрос контейнера (например, 128 Mi) | 128 МБ | ~3 МБ |
+| Глобально по умолчанию? | нет — выбирай регион(ы) | нет — выбирай регион | **да — все POP** |
+| Модель оплаты | ноды 24/7 | за запрос + ГБ·с | за запрос, без привязки к региону |
+| Бесплатный тариф | только локально (k3d) | 1 млн запросов/мес | **100 тыс. запросов/день** |
+| Стоимость простоя при нулевом трафике | полный счёт за ноды | ~$0 | ~$0 |
+| Долгие задачи | да (любые) | до 15 мин | 30 с по стенным часам (платно; CPU 50 мс – 5 мин) |
+| Нативные бинарники / Python wheels | да | да | ограниченно (Python через Pyodide, без C-расширений) |
+
 **Read it as:** Workers win on latency + price floor; Lambda wins on per-request runtime flexibility; K8s wins on long-running, native, stateful workloads.
+
+**Читай так:** Workers выигрывают по задержке и нижней планке цены; Lambda — по гибкости рантайма на каждый запрос; K8s — на долгих, нативных и stateful-нагрузках.
 
 ---
 
 ## 📍 Slide 13 – 🧭 Section 2: The Other Edge Players
 
+Слайд 13 — Раздел 2: другие игроки на edge
+
 Edge is not a Cloudflare monopoly:
+
+Edge — не монополия Cloudflare:
 
 | Platform | Runtime | Sweet spot |
 |----------|---------|-----------|
@@ -269,18 +432,39 @@ Edge is not a Cloudflare monopoly:
 | **Fastly Compute** | Wasmtime (WASM) | latency + portability |
 | **Akamai Functions** (ex-Fermyon) | Spin / WASM | post-Akamai acquisition Dec 2025 |
 
+| Платформа | Рантайм | Для чего лучше всего |
+|----------|---------|-----------|
+| **Cloudflare Workers** | V8-изоляты (workerd) | JS/TS в каждом POP |
+| **Vercel Edge Functions** | V8-изоляты на инфраструктуре Cloudflare | middleware для Next.js |
+| **AWS Lambda@Edge** | Lambda в POP CloudFront | переписывание запросов |
+| **AWS CloudFront Functions** | JS, доли миллисекунды | только переписывание заголовков |
+| **Deno Deploy** | V8-изоляты, Deno API | приоритет TypeScript |
+| **Fastly Compute** | Wasmtime (WASM) | низкая задержка и переносимость |
+| **Akamai Functions** (экс-Fermyon) | Spin / WASM | после покупки Akamai в декабре 2025 |
+
 > 💡 **Pattern:** every player is converging on **isolate-or-Wasm + global anycast**. The container is missing from the picture by design.
+>
+> 💡 **Закономерность:** все игроки сходятся к формуле **изолят-или-WASM + глобальный anycast**. Контейнера на этой картине нет намеренно.
 
 ---
 
 ## 📍 Slide 14 – 🔥🕸️ microVMs and WASM — The Other Lightweight Runtimes
 
+Слайд 14 — 🔥🕸️ microVM и WASM — другие лёгкие рантаймы
+
 If V8 isolates are too constrained but a container is too heavy:
+
+Если V8-изоляты слишком тесны, а контейнер слишком тяжёл:
 
 | Runtime | Boot | Isolation | Who picks it |
 |---------|------|-----------|--------------|
 | 🔥 **Firecracker microVM** | ~125 ms, <5 MiB overhead | Real KVM, hardware-enforced | AWS Lambda, Fargate, **Fly.io**, e2b.dev, modal.com |
 | 🕸️ **WASM** (Wasmtime, workerd) | sub-ms | Language sandbox + capability-based WASI | Fermyon Spin, Fastly Compute, Shopify functions, Cloudflare |
+
+| Рантайм | Загрузка | Изоляция | Кто выбирает |
+|---------|------|-----------|--------------|
+| 🔥 **Firecracker microVM** | ~125 мс, накладные расходы <5 МиБ | настоящий KVM, изоляция на уровне железа | AWS Lambda, Fargate, **Fly.io**, e2b.dev, modal.com |
+| 🕸️ **WASM** (Wasmtime, workerd) | доли миллисекунды | языковая песочница + capability-based WASI | Fermyon Spin, Fastly Compute, функции Shopify, Cloudflare |
 
 ```mermaid
 flowchart LR
@@ -290,35 +474,60 @@ flowchart LR
   Rt --> W1[.wasm modules<br/>polyglot tenants]
 ```
 
+Схема: 🖥️ bare metal → 🐧 KVM → 🔥 по одной Firecracker VM на арендатора; параллельно bare metal → 🕸️ рантайм Wasm → `.wasm`-модули на разных языках.
+
 * 🔥 **Firecracker** — AWS open-sourced it 2018, 150 microVMs/sec/host. **Lambda and Fly.io picked the same brick, exposed different APIs.**
+  * 🔥 **Firecracker** — AWS открыл его в 2018 году, 150 microVM в секунду на хост. **Lambda и Fly.io взяли один и тот же кирпич, но построили разные API.**
 * 🕸️ **WASM** — polyglot (Rust/Go/Python/TS → one binary). WASI 0.2 (Feb 2024, component model). WASI 0.3 (async I/O, late 2025).
+  * 🕸️ **WASM** — полиглот (Rust/Go/Python/TS → один бинарник). WASI 0.2 (февраль 2024, component model). WASI 0.3 (async I/O, конец 2025).
 * 🏭 **Production scale:** Fermyon Spin peaked at 75M req/sec before **Akamai acquired Fermyon in Dec 2025**, relaunching as Akamai Functions.
+  * 🏭 **Продакшен-масштаб:** Fermyon Spin достигал пика 75 млн запросов в секунду до того, как **Akamai купил Fermyon в декабре 2025**, перезапустив продукт как Akamai Functions.
 * ⚠️ **2026 caveat for WASM:** still gappy. No full network stack everywhere. Great at the edge today; not yet ready for general backends.
+  * ⚠️ **Оговорка про WASM в 2026-м:** всё ещё с пробелами. Полного сетевого стека нет везде. На edge сейчас отлично, но для обычных бэкендов пока не готово.
 
 ---
 
 ## 📍 Slide 15 – ❄️ Section 3: Reproducible Builds — A Different Frontier
 
+Слайд 15 — Раздел 3: воспроизводимые сборки — другой фронтир
+
 Containers solved "works on my machine." **Did they really?**
 
+Контейнеры решили проблему «работает у меня». **Но правда ли?**
+
 * 🐳 `FROM python:3.13-slim` — what's actually in that tag *today* vs six months ago? Different.
+  * 🐳 `FROM python:3.13-slim` — что на самом деле в этом теге *сегодня* и полгода назад? Разное.
 * 📦 `pip install -r requirements.txt` — transitive deps drift even with `==` pins
+  * 📦 `pip install -r requirements.txt` — транзитивные зависимости меняются даже с пинами `==`
 * 🕒 Docker layers embed timestamps → same `Dockerfile`, different image SHA every build
+  * 🕒 Слои Docker содержат временные метки → один и тот же `Dockerfile`, но разный SHA образа при каждой сборке
 * 🐛 The Toyota incident (2022) and the xz-utils backdoor (Mar 2024) both leaned on the gap between *"what you thought you built"* and *"what shipped"*
+  * 🐛 Инцидент с Toyota (2022) и бэкдор в xz-utils (март 2024) опирались как раз на разрыв между *«тем, что ты думал, что собрал»* и *«тем, что уехало в прод»*
 
 **Nix's promise:** *bit-for-bit identical output, on any machine, today and in 2036* — because every input (compilers, sources, flags) is hashed into the output path.
 
+**Обещание Nix:** *побитово идентичный результат на любой машине, сегодня и в 2036 году* — потому что каждый вход (компиляторы, исходники, флаги) хешируется в путь результата.
+
 > 💬 **Eelco Dolstra's PhD thesis (2006) defined the model.** Twenty years later it's the only system that actually delivers it.
+>
+> 💬 **Докторская диссертация Элко Долстры (2006) задала модель.** Спустя двадцать лет это единственная система, которая реально её выполняет.
 
 ---
 
 ## 📍 Slide 16 – 🧬 Nix in One Slide
 
+Слайд 16 — Nix на одном слайде
+
 * 📦 **Package manager + build system + config system** — same tool, three jobs
+  * 📦 **Пакетный менеджер + система сборки + система конфигурации** — один инструмент, три роли
 * 🗄️ **The Nix store** — `/nix/store/<sha256>-<name>-<version>` — content-addressed, immutable
+  * 🗄️ **Хранилище Nix** — `/nix/store/<sha256>-<name>-<version>` — content-addressed, неизменяемое
 * 🔒 **Pure builds** — sandboxed, no network (except fixed-output derivations), no `/home`, no clock
+  * 🔒 **Чистые сборки** — в песочнице, без сети (кроме fixed-output derivations), без `/home`, без часов
 * ❄️ **Same hash everywhere** — cache hit on `cache.nixos.org` = no rebuild
+  * ❄️ **Один и тот же хеш везде** — попадание в кеш на `cache.nixos.org` = пересборки нет
 * 🌊 **Lazy evaluation** — 100k+ packages in nixpkgs, you only build what you reference
+  * 🌊 **Ленивые вычисления** — 100 тыс.+ пакетов в nixpkgs, а собирается только то, на что ты ссылаешься
 
 ```mermaid
 flowchart LR
@@ -330,13 +539,21 @@ flowchart LR
   Build --> Path
 ```
 
+Схема: входы (исходники + зависимости + компилятор + флаги) → хеш sha256 → путь в `/nix/store/...`; если уже собрано — переиспользуем, иначе — сборка в песочнице, которая возвращает тот же путь.
+
 **One sentence:** Nix turns the build into a pure function of its inputs.
+
+**Одной фразой:** Nix превращает сборку в чистую функцию от её входов.
 
 ---
 
 ## 📍 Slide 17 – 🧪 A Derivation, Concretely
 
+Слайд 17 — Derivation на конкретном примере
+
 `default.nix` — your Lab 1 Flask service, Nix-built:
+
+Файл `default.nix` — твой Flask-сервис из лабы 1, собранный через Nix:
 
 ```nix
 { pkgs ? import <nixpkgs> {} }:
@@ -355,15 +572,21 @@ pkgs.python3Packages.buildPythonApplication {
 }
 ```
 
+Пояснение к коду: `buildPythonApplication` описывает пакет `devops-info-service` версии 1.0.0; зависимость — `flask`, а `installPhase` копирует `app.py` в `$out/bin` и оборачивает его через `wrapProgram`, чтобы Python нашёл зависимости.
+
 ```bash
 nix-build           # → ./result symlink into /nix/store/<hash>-...
 ./result/bin/devops-info-service
 nix-hash --type sha256 result   # this hash is the same on every machine, forever
 ```
 
+Пояснение к коду: `nix-build` создаёт симлинк `./result` в `/nix/store`; запускаем собранный бинарник; хеш результата одинаков на любой машине и не меняется.
+
 ---
 
 ## 📍 Slide 18 – 📦 dockerTools — Reproducible Containers Without a Dockerfile
+
+Слайд 18 — dockerTools — воспроизводимые контейнеры без Dockerfile
 
 ```nix
 # docker.nix
@@ -381,13 +604,19 @@ pkgs.dockerTools.buildLayeredImage {
 }
 ```
 
+Пояснение к коду: `buildLayeredImage` собирает образ слоями; поле `created` зафиксировано на эпохе Unix — это и есть трюк воспроизводимости.
+
 ```bash
 nix-build docker.nix
 docker load < result          # tarball → docker image
 sha256sum result              # build twice → same hash. Try that with `docker build`.
 ```
 
+Пояснение к коду: собираем образ, загружаем тарбол в Docker и сверяем хеш; при двух сборках он одинаков, в отличие от `docker build`.
+
 **Why this works where `docker build` doesn't:**
+
+**Почему это работает там, где не работает `docker build`:**
 
 | Problem | `docker build` | Nix `dockerTools` |
 |---------|---------------|-------------------|
@@ -396,15 +625,31 @@ sha256sum result              # build twice → same hash. Try that with `docker
 | `apt-get install` | resolves to latest each run | every dep is a store path |
 | Resulting image hash | changes every build | **identical every build** |
 
+| Проблема | `docker build` | Nix `dockerTools` |
+|---------|---------------|-------------------|
+| Временные метки сборки | записываются в каждый слой | зафиксированы на эпохе |
+| Дрейф базового образа | `python:3.13-slim` меняется под тобой | ревизия nixpkgs хешируется в результат |
+| `apt-get install` | каждый раз ставит последнюю версию | каждая зависимость — путь в store |
+| Хеш готового образа | меняется при каждой сборке | **идентичен при каждой сборке** |
+
 > 🔗 **Lab 18 tie-in:** you'll do exactly this — rebuild Lab 1's Python app and Lab 2's Docker image with Nix, then prove the hash equality with `sha256sum`.
+>
+> 🔗 **Связь с лабой 18:** ты сделаешь ровно это — пересоберёшь Python-приложение из лабы 1 и Docker-образ из лабы 2 через Nix, а затем докажешь равенство хешей через `sha256sum`.
 
 ---
 
 ## 📍 Slide 19 – 🌊 Flakes — Nix With a Lockfile
 
+Слайд 19 — Flakes — Nix с lock-файлом
+
 Pre-flakes Nix was reproducible *if you were disciplined.* Flakes make it the default.
 
+До flakes Nix был воспроизводимым *только при дисциплине.* Flakes делают это поведением по умолчанию.
+
 `flake.nix`:
+
+Файл `flake.nix`:
+
 ```nix
 {
   description = "DevOps Info Service — reproducible build";
@@ -425,17 +670,25 @@ Pre-flakes Nix was reproducible *if you were disciplined.* Flakes make it the de
 }
 ```
 
+Пояснение к коду: `inputs` фиксирует nixpkgs на ветке `nixos-24.11`; `outputs` собирает пакет, Docker-образ и devShell из `default.nix` и `docker.nix`.
+
 ```bash
 nix flake update         # → flake.lock pins nixpkgs to an exact git SHA
 nix build                # builds packages.default
 nix develop              # drops you into a shell with pinned Python + Flask
 ```
 
+Пояснение к коду: `nix flake update` обновляет `flake.lock` и фиксирует nixpkgs на точном git SHA; `nix build` собирает `packages.default`; `nix develop` открывает шелл с зафиксированными Python и Flask.
+
 **`flake.lock` is the missing piece** — like `package-lock.json` or `Cargo.lock`, but for the **entire dependency closure** down to libc.
+
+**`flake.lock` — недостающий элемент** — вроде `package-lock.json` или `Cargo.lock`, но для **всего замыкания зависимостей** вплоть до libc.
 
 ---
 
 ## 📍 Slide 20 – 🪐 The Nix Ecosystem in 2026
+
+Слайд 20 — Экосистема Nix в 2026 году
 
 | Player | One-liner |
 |--------|-----------|
@@ -447,11 +700,25 @@ nix develop              # drops you into a shell with pinned Python + Flask
 | **FlakeHub** (Determinate Systems) | SemVer + signed flakes registry |
 | **`devenv`, `flox`** | Higher-level dev-shell front ends over Nix |
 
+| Игрок | В двух словах |
+|--------|-----------|
+| **Классический CLI** (`nix-build`, `nix-shell`) | Всё ещё поддерживается — с этого ты начнёшь лабу 18 |
+| **Команда `nix`** (Nix 2.4+, зрелая в 2.25) | UX, родной для flakes: `nix build`, `nix develop`, `nix flake` |
+| **Determinate Nix** | Курируемый установщик + корпоративная сборка; flakes включены по умолчанию |
+| **Lix** (форк сообщества, март 2024) | Замена один-в-один; быстрее вычисления, дружелюбнее управление |
+| **NixOS** | Полноценный дистрибутив Linux, построенный на Nix derivations |
+| **FlakeHub** (Determinate Systems) | Реестр flakes с SemVer и подписями |
+| **`devenv`, `flox`** | Фронтенды над Nix для dev-шеллов |
+
 **Production adoption:** Mercury, Replit, Shopify, Anthropic, Cachix-style CI. **Honest caveat:** the learning curve is real — give it 2 weeks before judging.
+
+**В продакшене:** Mercury, Replit, Shopify, Anthropic, CI в стиле Cachix. **Честная оговорка:** кривая обучения реальна — дай ей две недели, прежде чем судить.
 
 ---
 
 ## 📍 Slide 21 – 🧮 Section 4: The Decision Matrix
+
+Слайд 21 — Раздел 4: матрица решений
 
 ```mermaid
 flowchart TD
@@ -468,7 +735,11 @@ flowchart TD
   F -->|no| PaaS[🚂 PaaS — Fly, Render]
 ```
 
+Схема: начинаем с вопроса «Что ты выкатываешь?»; долгий stateful-сервис → Kubernetes; критична задержка по всему миру → edge Workers; пиковый эпизодический трафик → Lambda/Cloud Run; статический сайт или SPA → Pages/Vercel; нужна побитовая воспроизводимость → Nix на Fly/EC2; иначе → PaaS (Fly, Render).
+
 **Use-case cheatsheet:**
+
+**Шпаргалка по сценариям:**
 
 | Workload | Best fit |
 |---------|---------|
@@ -479,36 +750,68 @@ flowchart TD
 | Game backend, regional database | 🚂 Fly.io |
 | Security-audited build artifact | ❄️ Nix |
 
+| Нагрузка | Что лучше всего |
+|---------|---------|
+| Многосервисный бэкенд, внутренняя платформа | ☸️ Kubernetes |
+| Приёмник вебхуков, API с низкой задержкой | ⚡ Cloudflare Workers |
+| ML-инференс, cron-задача, батчи | 🔥 Lambda / Cloud Run |
+| Сайт документации, маркетинговая страница | 📄 Pages / Vercel / Netlify |
+| Бэкенд игры, региональная база данных | 🚂 Fly.io |
+| Артефакт сборки, прошедший security-аудит | ❄️ Nix |
+
 ---
 
 ## 📍 Slide 22 – 🚫 Anti-Patterns You'll See in the Wild
 
+Слайд 22 — Антипаттерны, которые встретишь в жизни
+
 1. ❌ **K8s for a single-tenant marketing site** — costs $200/mo to do what `index.html` on Cloudflare Pages does for free
+   * ❌ **K8s для однопользовательского маркетингового сайта** — $200/мес за то, что `index.html` на Cloudflare Pages делает бесплатно
 2. ❌ **Lambda for a 24/7 API** — connection re-init eats your latency budget; HPA on K8s is cheaper at steady state
+   * ❌ **Lambda для API, работающего 24/7** — переподключения съедают бюджет задержки; HPA в K8s при стабильной нагрузке дешевле
 3. ❌ **Cloudflare Workers for a long-running Python data job** — 30 s wall-clock and Pyodide-only Python isn't built for it
+   * ❌ **Cloudflare Workers для долгой Python-задачи по данным** — 30 секунд по стенным часам и Python только через Pyodide для этого не годятся
 4. ❌ **Nix in a team that has never seen it** — without a champion, the learning curve sinks adoption (2-week ramp is real)
+   * ❌ **Nix в команде, которая его никогда не видела** — без энтузиаста кривая обучения топит внедрение (две недели на разгон — это правда)
 5. ❌ **"Edge everything"** — your database is in us-east-1; the edge round-trip back to origin negates the latency win
+   * ❌ **«Всё на edge»** — твоя база в us-east-1; обратный рейс с edge к origin съедает весь выигрыш в задержке
 6. ❌ **microVMs for static content** — Firecracker is overkill for HTML
+   * ❌ **microVM для статического контента** — Firecracker избыточен для HTML
 
 > 💡 **The fix is always the same:** name the problem first, pick the abstraction last.
+>
+> 💡 **Решение всегда одно:** сначала назови проблему, абстракцию выбирай последней.
 
 ---
 
 ## 📍 Slide 23 – 🏢 Real-World Picks
 
+Слайд 23 — Выбор из реального мира
+
 * 🟧 **Cloudflare itself** — `workers.cloudflare.com` dashboard runs on Workers + D1
+  * 🟧 **Сама Cloudflare** — дашборд `workers.cloudflare.com` работает на Workers + D1
 * 🟦 **Shopify Functions** — WASM, custom checkout logic at edge
+  * 🟦 **Shopify Functions** — WASM, пользовательская логика оформления заказа на edge
 * ✈️ **Fly.io** — runs every customer container as a Firecracker microVM, no K8s in the stack
+  * ✈️ **Fly.io** — запускает каждый контейнер клиента как Firecracker microVM, K8s в стеке нет
 * 🟣 **Anthropic, Mercury, Replit** — Nix in production for reproducible builds and devshells
+  * 🟣 **Anthropic, Mercury, Replit** — Nix в продакшене для воспроизводимых сборок и devshell
 * 🟢 **GitHub Actions runners** — Firecracker microVMs since 2023 for hardened runners
+  * 🟢 **GitHub Actions runners** — Firecracker microVM с 2023 года для укреплённых раннеров
 * 🟡 **Discord** — V8 isolates for slash command execution
+  * 🟡 **Discord** — V8-изоляты для выполнения слэш-команд
 * 🟠 **Akamai (ex-Fermyon, Dec 2025)** — Spin/WASM serverless competing with Workers
+  * 🟠 **Akamai (экс-Fermyon, декабрь 2025)** — serverless на Spin/WASM, конкурент Workers
 
 **Pattern:** the unsexy default is still K8s for stateful backends. The exciting innovation is happening at the edges of the spectrum — both literally and figuratively.
+
+**Закономерность:** «скучный» дефолт для stateful-бэкендов по-прежнему K8s. А интересные инновации происходят на краях спектра — и буквально, и фигурально.
 
 ---
 
 ## 📍 Slide 24 – 🔮 What's Next (Beyond 2026)
+
+Слайд 24 — Что дальше (после 2026 года)
 
 | Trend | Where it's going |
 |-------|------------------|
@@ -519,20 +822,41 @@ flowchart TD
 | **AI-orchestrated platforms** | Cluster autoscaling and incident response by LLM agents |
 | **Local-first apps** | CRDTs + edge sync; the server becomes optional |
 
+| Тренд | Куда движется |
+|-------|------------------|
+| **WASI 0.3 + Component Model** | Полиглотный serverless, который действительно работает |
+| **Unikernels** (`unikraft`, `nanos`) | VM под одно приложение с загрузкой <50 мс |
+| **Плотность microVM** | 1000+ Firecracker VM на хост с общими снапшотами ядра |
+| **Confidential compute** | AMD SEV / Intel TDX для изоляции арендаторов в недоверенных облаках |
+| **Платформы с ИИ-оркестрацией** | Автомасштабирование кластера и реакция на инциденты силами LLM-агентов |
+| **Local-first приложения** | CRDT + синхронизация на edge; сервер становится необязательным |
+
 > 💬 *"The cloud is just someone else's computer. The edge is everyone's computer. The future is no one's computer."*
+>
+> 💬 *«Облако — это просто чужой компьютер. Edge — это компьютер каждого. Будущее — компьютер ничей.»*
 
 Pick the abstraction that lets your team move fastest **today** — but read the trade press, because the floor keeps moving.
+
+Выбирай абстракцию, которая позволяет твоей команде двигаться быстрее всего **сегодня**, — но читай профильную прессу, потому что планка постоянно сдвигается.
 
 ---
 
 ## 📍 Slide 25 – 🎯 Key Takeaways + Mindset Shift
 
+Слайд 25 — Главное + смена мышления
+
 1. ☸️ **K8s** = long-running, stateful, multi-service. **Not** a webhook.
+   * ☸️ **K8s** = долгие, stateful, многосервисные нагрузки. **Не** вебхук.
 2. ⚡ **V8 isolates ≠ containers** — language-layer sandbox, <5 ms cold start, ~3 MB memory floor
+   * ⚡ **V8-изоляты ≠ контейнеры** — песочница на уровне языка, холодный старт <5 мс, минимум памяти ~3 МБ
 3. 🔥 **Firecracker** powers Lambda and Fly.io — same brick, very different products
+   * 🔥 **Firecracker** лежит в основе Lambda и Fly.io — один кирпич, очень разные продукты
 4. 🕸️ **WASM** is the polyglot edge bet — great today at the edge, not yet for general backends
+   * 🕸️ **WASM** — ставка на полиглотный edge: сегодня хорош на edge, но пока не для общих бэкендов
 5. ❄️ **Nix** solves *reproducibility* — orthogonal to orchestration, not a substitute for it
+   * ❄️ **Nix** решает *воспроизводимость* — это ортогонально оркестрации, а не замена ей
 6. 🧮 **Decision matrix > tech-stack tribalism** — name the workload first, pick the runtime last
+   * 🧮 **Матрица решений важнее технологической верности** — сначала назови нагрузку, рантайм выбирай последним
 
 | 😰 Lecture-1 you | 🚀 Lecture-16 you |
 |------------------|-------------------|
@@ -542,18 +866,36 @@ Pick the abstraction that lets your team move fastest **today** — but read the
 | "Works on my machine" | "Works in the derivation — works on every machine" |
 | "DevOps is YAML" | "DevOps is shortening the feedback loop, however we get there" |
 
+| 😰 Ты на лекции 1 | 🚀 Ты на лекции 16 |
+|------------------|-------------------|
+| «Просто добавь Docker» | «А контейнер-то ему вообще нужен?» |
+| «Куда мне это задеплоить?» | «Какая модель деплоя подходит под нагрузку?» |
+| «Kubernetes — это ответ» | «K8s — **один из** ответов; а какой вопрос мы задаём?» |
+| «Работает у меня» | «Работает в derivation — работает на любой машине» |
+| «DevOps — это YAML» | «DevOps — это сокращение петли обратной связи, как бы мы к этому ни шли» |
+
 > 💬 *"The best architecture is the one your team can operate successfully on a Friday afternoon."*
+>
+> 💬 *«Лучшая архитектура — та, которую твоя команда может успешно эксплуатировать в пятницу после обеда.»*
 
 ---
 
 ## 📍 Slide 26 – 🚀 What Comes Next
 
+Слайд 26 — Что дальше
+
 **This is the last lecture.** What's left:
 
+**Это последняя лекция.** Что осталось:
+
 * 🧪 **Lab 16** — Kube-Prometheus + init containers (required, completes the core track)
+  * 🧪 **Лаба 16** — Kube-Prometheus + init-контейнеры (обязательная, завершает core-трек)
 * 🌍 **Lab 17 (bonus / exam alternative)** — Cloudflare Workers edge API. 10 main + 2 bonus pts.
+  * 🌍 **Лаба 17 (бонус / альтернатива экзамену)** — edge API на Cloudflare Workers. 10 основных + 2 бонусных балла.
 * ❄️ **Lab 18 (bonus / exam alternative)** — Nix reproducible Python + Docker. 10 main + 2 bonus pts.
+  * ❄️ **Лаба 18 (бонус / альтернатива экзамену)** — воспроизводимые Python + Docker сборки на Nix. 10 основных + 2 бонусных балла.
 * 🏆 **Lab 17 + Lab 18 together** = the bonus-lab track = **20% of the grade** = full **exam replacement** option
+  * 🏆 **Лабы 17 + 18 вместе** = трек бонусных лаб = **20% итоговой оценки** = полная **замена экзамена**
 
 ```mermaid
 flowchart LR
@@ -564,34 +906,70 @@ flowchart LR
   Lab18 --> Exam
 ```
 
+Схема: лекция 15 (наблюдаемость) → лекция 16 (за пределами K8s) → лабы 17 (Workers) и 18 (Nix), каждая ведёт к альтернативе экзамена.
+
 > 🎓 **Post-lecture quiz feeds the weeks 13–16 leaderboard window. You've finished the lecture series — go finish Lab 16 and pick your bonus labs.**
+>
+> 🎓 **Квиз после лекции идёт в зачёт лидерборда недель 13–16. Лекции у тебя закончились — иди добивай лабу 16 и выбирай бонусные лабы.**
 
 ---
 
 ## 📚 Resources
 
+📚 Ресурсы
+
 **Cloudflare Workers:**
+
+**Cloudflare Workers:**
+
 * 🌐 [Cloudflare Workers docs](https://developers.cloudflare.com/workers/) — runtime, KV, D1, R2, Durable Objects
+  * 🌐 [Документация Cloudflare Workers](https://developers.cloudflare.com/workers/) — рантайм, KV, D1, R2, Durable Objects
 * 🌐 [Wrangler v3 → v4 migration guide](https://developers.cloudflare.com/workers/wrangler/migration/update-v3-to-v4/) — local-by-default is the big change
+  * 🌐 [Гайд по миграции Wrangler v3 → v4](https://developers.cloudflare.com/workers/wrangler/migration/update-v3-to-v4/) — главное изменение: local-by-default
 * 🌐 [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/) — free tier still 100k req/day
+  * 🌐 [Цены Workers](https://developers.cloudflare.com/workers/platform/pricing/) — бесплатный тариф всё ещё 100 тыс. запросов в день
 * 📕 *Cloudflare Workers Up and Running* — Cordova & White, 2024
+  * 📕 *Cloudflare Workers Up and Running* — Cordova & White, 2024
 
 **Nix:**
+
+**Nix:**
+
 * 🌐 [nix.dev](https://nix.dev/) — official tutorials
+  * 🌐 [nix.dev](https://nix.dev/) — официальные туториалы
 * 🌐 [Zero to Nix](https://zero-to-nix.com/) — Determinate Systems' beginner track
+  * 🌐 [Zero to Nix](https://zero-to-nix.com/) — вводный трек от Determinate Systems
 * 🌐 [Nix Pills](https://nixos.org/guides/nix-pills/) — deep dive for the curious
+  * 🌐 [Nix Pills](https://nixos.org/guides/nix-pills/) — глубокое погружение для любопытных
 * 🌐 [FlakeHub](https://flakehub.com/) — semver flakes registry
+  * 🌐 [FlakeHub](https://flakehub.com/) — semver-реестр flakes
 * 📕 *Nix from the Ground Up* — Burkitt, 2024
+  * 📕 *Nix from the Ground Up* — Burkitt, 2024
 
 **Edge / microVM / WASM:**
+
+**Edge / microVM / WASM:**
+
 * 🌐 [Firecracker](https://firecracker-microvm.github.io/) — the microVM that powers Lambda and Fly.io
+  * 🌐 [Firecracker](https://firecracker-microvm.github.io/) — microVM, на которой работают Lambda и Fly.io
 * 🌐 [Fly.io architecture](https://fly.io/docs/reference/architecture/) — microVMs in practice
+  * 🌐 [Архитектура Fly.io](https://fly.io/docs/reference/architecture/) — microVM на практике
 * 🌐 [Fermyon Spin](https://www.fermyon.com/spin) — WASI serverless, now under Akamai
+  * 🌐 [Fermyon Spin](https://www.fermyon.com/spin) — WASI serverless, теперь под Akamai
 * 🎥 *Containers from Scratch* — Liz Rice, GopherCon 2017 (still the best 40 min on the runtime layer)
+  * 🎥 *Containers from Scratch* — Liz Rice, GopherCon 2017 (лучшие 40 минут про уровень рантайма)
 
 **Course closing reading:**
+
+**Финальное чтение курса:**
+
 * 📕 *Accelerate* — Forsgren, Humble, Kim (2018) — the DORA evidence behind "ship small, ship often"
+  * 📕 *Accelerate* — Forsgren, Humble, Kim (2018) — данные DORA в пользу «выпускай малыми порциями и часто»
 * 📕 *The DevOps Handbook* — Kim, Humble, Debois, Willis (2016, 2e 2021)
+  * 📕 *The DevOps Handbook* — Kim, Humble, Debois, Willis (2016, 2-е изд. 2021)
 * 🌐 [CNCF Landscape](https://landscape.cncf.io/) — the map keeps changing; come back yearly
+  * 🌐 [CNCF Landscape](https://landscape.cncf.io/) — карта постоянно меняется; возвращайся каждый год
 
 **🎓 Quiz:** post-lecture quiz feeds the **weeks 13–16 leaderboard window**. You've finished the lecture series — go finish Lab 16 and pick your bonus labs.
+
+**🎓 Квиз:** квиз после лекции идёт в зачёт **лидерборда недель 13–16**. Лекции у тебя закончились — иди добивай лабу 16 и выбирай бонусные лабы.
